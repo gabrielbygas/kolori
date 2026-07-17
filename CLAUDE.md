@@ -27,13 +27,13 @@ Laravel 13 (PHP 8.3) + Inertia + Vue 3 + Tailwind, MySQL 8/MariaDB, Breeze (auth
 
 ## 4. Périmètre fonctionnel V1 (IN)
 
-- Catalogue produits multi-unités/emballages (kg, sac, litre, bidon, pièce, paquet, rouleau, boîte, carton), prix détail/gros par variante, origine local/importé.
-- Stock simple : quantité courante + mouvements (pas de workflow d'achat formel).
-- Vente/POS : sélection produits, calcul double devise, paiement espèces uniquement (V1), reçu PDF/impression navigateur.
-- Tableau de bord basique : ventes du jour, alertes stock bas.
-- Page config : nom du magasin, logo, couleurs, langue, taux de change, taux de TVA.
-- Rôles (≤5, définis en dur) : `admin`, `vendeur`, `logisticien` (2 slots optionnels si besoin réel apparaît).
-- Multi-magasin : une entreprise, plusieurs magasins (table `stores` + scoping `store_id`).
+- [x] Rôles (≤5, définis en dur) : `admin`, `vendeur`, `logisticien` (2 slots optionnels si besoin réel apparaît).
+- [ ] Catalogue produits multi-unités/emballages (kg, sac, litre, bidon, pièce, paquet, rouleau, boîte, carton), prix détail/gros par variante, origine local/importé.
+- [ ] Stock simple : quantité courante + mouvements (pas de workflow d'achat formel).
+- [ ] Vente/POS : sélection produits, calcul double devise, paiement espèces uniquement (V1), reçu PDF/impression navigateur.
+- [ ] Tableau de bord basique : ventes du jour, alertes stock bas.
+- [ ] Page config : nom du magasin, logo, couleurs, langue, taux de change, taux de TVA.
+- [ ] Multi-magasin : une entreprise, plusieurs magasins (table `stores` + scoping `store_id`).
 
 ## 5. Hors scope V1 (explicitement exclu)
 
@@ -61,10 +61,19 @@ PlanetHoster ou VPS allemand économique. PWA installable. Cron serveur 5h/23h p
 
 ## 10. Jalons de livraison
 
-- **S1** — Socle (fait : Laravel + Breeze + Spatie Permission + UUID + rôles), catalogue produits, stock.
-- **S2** — Vente/POS, double devise, page config (branding + taux + TVA), queue offline PWA.
-- **S3** — Rapports, reçus PDF, polish responsive, tests du flux critique, déploiement.
+- **S1** — [x] Socle (Laravel + Breeze + Spatie Permission + UUID + rôles). [ ] Catalogue produits. [ ] Stock.
+- **S2** — [ ] Vente/POS, double devise, page config (branding + taux + TVA), queue offline PWA.
+- **S3** — [ ] Rapports, reçus PDF, polish responsive, tests du flux critique, déploiement.
+
+## 11. Workflow pour chaque point du plan
+
+Pour toute nouvelle fonctionnalité ou modification sur ce projet, suivre cet ordre à chaque fois, sans sauter d'étape :
+
+1. **Exécuter le code** — le faire tourner réellement (serveur, build, route/flux concerné), pas seulement l'écrire.
+2. **Tester le code** — `php artisan test` (+ tests ciblés si ajoutés) doivent passer avant de considérer le point terminé.
+3. **Mettre à jour `README.md` et `CLAUDE.md`** — cocher ce qui est fait, ajuster §"État actuel" et les cases à cocher concernées.
+4. **Proposer le plan du point suivant** — maximum 5 sous-points si le point suivant est complexe, sinon l'annoncer directement en une phrase. Ne pas exécuter le point suivant sans validation explicite.
 
 ## État actuel
 
-Squelette posé le 2026-07-17 : Laravel 13 + Breeze (Vue/Inertia/Tailwind) + Spatie Permission + UUID sur `users` et les tables de permissions + rôles `admin`/`vendeur`/`logisticien` seedés. Reste à faire : §4 (catalogue, stock, vente, config, multi-magasin) et §2 (PWA offline).
+Squelette posé et poussé sur GitHub (`gabrielbygas/kolori`) le 2026-07-17 : Laravel 13 + Breeze (Vue/Inertia/Tailwind) + Spatie Permission + UUID sur `users` et les tables de permissions + rôles `admin`/`vendeur`/`logisticien` seedés. Reste à faire : §4 (catalogue, stock, vente, config, multi-magasin) et §2 (PWA offline).
