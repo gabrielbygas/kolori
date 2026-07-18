@@ -132,6 +132,29 @@ Vérifié : `php artisan test --filter=ProductManagementTest` (8 passed / 28 ass
 
 ---
 
+## Ajustements hors plan (2026-07-18)
+
+Demandés par l'utilisateur après la démo de fin de point 4, avant de démarrer le point 5.
+
+- **Suppression de la page d'accueil publique** : `resources/js/Pages/Welcome.vue` supprimé. `routes/web.php` : `/` fait désormais `Route::redirect('/', '/login')` — un invité tombe directement sur le login, un utilisateur déjà connecté est renvoyé au dashboard (comportement natif de `RedirectIfAuthenticated`, qui vérifie la route nommée `dashboard`).
+- **Suppression de l'inscription publique** : routes `GET/POST /register` retirées de `routes/auth.php`, `app/Http/Controllers/Auth/RegisteredUserController.php` et `resources/js/Pages/Auth/Register.vue` supprimés, `tests/Feature/Auth/RegistrationTest.php` supprimé (n'avait plus de route à tester). `tests/Feature/ExampleTest.php` mis à jour pour refléter la redirection de `/`.
+- **Nouvelle fonctionnalité : gestion des utilisateurs (admin uniquement)** — décision utilisateur : page dédiée liste + création, rôles assignables = admin/vendeur/logisticien (les 3).
+  - `app/Http/Requests/User/StoreUserRequest.php` — validation (email unique, mot de passe confirmé, rôle parmi les 3 valides).
+  - `app/Actions/User/CreateUserAction.php` — crée le compte et assigne le rôle dans une transaction ; ne connecte jamais automatiquement l'admin créateur à la place du nouveau compte (vérifié par test : `assertAuthenticatedAs($admin)`).
+  - `app/Http/Resources/UserResource.php` — expose id/name/email/phone/is_active/roles.
+  - `app/Http/Controllers/UserController.php` — `index` (liste paginée, rôles eager-loadés), `create`, `store`.
+  - `routes/web.php` — `Route::resource('users', ...)->only(['index','create','store'])` sous `['auth','verified','role:admin']` (logisticien exclu, contrairement au catalogue).
+  - `resources/js/Pages/Users/Index.vue`, `Create.vue` — mêmes conventions que `Products/*`.
+  - `resources/js/Layouts/AuthenticatedLayout.vue` — lien nav "Utilisateurs" visible admin uniquement (`isAdmin` computed).
+  - `tests/Feature/UserManagementTest.php` — 6 tests : création avec rôle + admin reste connecté, 403 pour vendeur/logisticien, redirection invité, email dupliqué rejeté, liste affiche les rôles.
+- **`database/seeders/DemoProductSeeder.php`** — 5 produits d'exemple avec variantes (répond à "pourquoi je ne vois rien dans /products" : les seeders du point 4.2 ne créaient que les données de référence — unités/emballages/catégories —, jamais de produits). Appelé depuis `DatabaseSeeder` uniquement si `app()->environment('local')` — jamais en production/déploiement client.
+
+Vérifié : suite de tests complète (37 passed / 101 assertions), `vendor/bin/pint --test` propre, `php artisan migrate:fresh --seed` puis parcours manuel en navigateur (redirection `/`, 404 sur `/register`, connexion admin, `/products` affiche les 5 produits de démo, création d'un utilisateur "Jean Vendeur" avec rôle vendeur via `/users/create` — donnée de test nettoyée ensuite).
+
+⚠️ Le navigateur intégré de l'outil s'est bloqué une fois en cours de route (screenshot en timeout) — contournement en ouvrant un nouvel onglet, sans lien avec l'application (confirmé par un test HTTP direct qui passait pendant le blocage).
+
+---
+
 ## Points suivants
 
 Non décomposés pour l'instant (seront détaillés en sous-points quand ils deviendront le point courant), voir §4/§10 de `CLAUDE.md` pour le contenu prévu. Prochain point : **5 — Stock (quantités + mouvements)**.

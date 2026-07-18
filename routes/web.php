@@ -2,18 +2,14 @@
 
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
-use Illuminate\Foundation\Application;
+use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
-Route::get('/', function () {
-    return Inertia::render('Welcome', [
-        'canLogin' => Route::has('login'),
-        'canRegister' => Route::has('register'),
-        'laravelVersion' => Application::VERSION,
-        'phpVersion' => PHP_VERSION,
-    ]);
-});
+// modify by claude
+// Pas de page d'accueil publique : "/" renvoie vers le login (redirige vers
+// le dashboard si déjà connecté, via RedirectIfAuthenticated sur /login).
+Route::redirect('/', '/login');
 
 Route::get('/dashboard', function () {
     return Inertia::render('Dashboard');
@@ -28,6 +24,11 @@ Route::middleware('auth')->group(function () {
 // modify by claude
 Route::middleware(['auth', 'verified', 'role:admin|logisticien'])->group(function () {
     Route::resource('products', ProductController::class)->only(['index', 'create', 'store', 'edit', 'update']);
+});
+
+// modify by claude
+Route::middleware(['auth', 'verified', 'role:admin'])->group(function () {
+    Route::resource('users', UserController::class)->only(['index', 'create', 'store']);
 });
 
 require __DIR__.'/auth.php';

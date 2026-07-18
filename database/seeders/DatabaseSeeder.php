@@ -26,5 +26,11 @@ class DatabaseSeeder extends Seeder
             'email' => 'admin@kolori.test',
         ]);
         $admin->assignRole('admin');
+
+        // modify by claude
+        // Produits d'exemple : dev local uniquement, jamais en production/déploiement client.
+        if (app()->environment('local')) {
+            $this->call(DemoProductSeeder::class);
+        }
     }
 }

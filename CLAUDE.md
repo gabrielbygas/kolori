@@ -151,6 +151,6 @@ Pour toute nouvelle fonctionnalité ou modification sur ce projet, suivre cet or
 
 ## État actuel
 
-Squelette posé et poussé sur GitHub (`gabrielbygas/kolori`) le 2026-07-17 : Laravel 13 + Breeze (Vue/Inertia/Tailwind) + Spatie Permission + UUID sur `users` et les tables de permissions + rôles `admin`/`vendeur`/`logisticien` seedés. Catalogue produits (point 4) terminé le 2026-07-18 : tables + seeder (27 catégories) + modèles + CRUD Inertia/Vue (admin/logisticien) + API Resources + tests.
+Squelette posé et poussé sur GitHub (`gabrielbygas/kolori`) le 2026-07-17 : Laravel 13 + Breeze (Vue/Inertia/Tailwind) + Spatie Permission + UUID sur `users` et les tables de permissions + rôles `admin`/`vendeur`/`logisticien` seedés. Catalogue produits (point 4) terminé le 2026-07-18 : tables + seeder (27 catégories) + modèles + CRUD Inertia/Vue (admin/logisticien) + API Resources + tests. Pas d'inscription publique : comptes créés par un admin via `/users` (voir `tasks.md` — "Ajustements hors plan").
 
 Détail point par point (statut, sous-points en cours, journal) : voir [`tasks.md`](./tasks.md).
