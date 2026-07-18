@@ -2,6 +2,10 @@
 
 Plan V1 validé le 2026-07-17. Référence transverse pour toute décision technique sur ce projet — à relire avant tout travail substantiel.
 
+## Suivi de l'avancement
+
+**[`tasks.md`](./tasks.md) est la source de vérité de l'avancement du projet** — vue d'ensemble des points du plan, statut de chacun, décomposition en sous-points du point courant, et journal de ce qui a été fait (pages/fonctions créées/modifiées/supprimées) après chaque sous-point exécuté et testé. À consulter en début de session, et à tenir à jour au fur et à mesure (voir workflow §11 ci-dessous).
+
 ## Best practices à charger
 
 - Laravel → ~/.claude/best-practices/laravel_best_practices.md
@@ -76,4 +80,6 @@ Pour toute nouvelle fonctionnalité ou modification sur ce projet, suivre cet or
 
 ## État actuel
 
-Squelette posé et poussé sur GitHub (`gabrielbygas/kolori`) le 2026-07-17 : Laravel 13 + Breeze (Vue/Inertia/Tailwind) + Spatie Permission + UUID sur `users` et les tables de permissions + rôles `admin`/`vendeur`/`logisticien` seedés. Reste à faire : §4 (catalogue, stock, vente, config, multi-magasin) et §2 (PWA offline).
+Squelette posé et poussé sur GitHub (`gabrielbygas/kolori`) le 2026-07-17 : Laravel 13 + Breeze (Vue/Inertia/Tailwind) + Spatie Permission + UUID sur `users` et les tables de permissions + rôles `admin`/`vendeur`/`logisticien` seedés.
+
+Détail point par point (statut, sous-points en cours, journal) : voir [`tasks.md`](./tasks.md).
