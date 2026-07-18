@@ -19,7 +19,7 @@ php artisan key:generate
 # renseigner DB_DATABASE / DB_USERNAME / DB_PASSWORD dans .env
 
 php artisan migrate
-php artisan db:seed   # crée les rôles admin/vendeur/logisticien + un admin de dev
+php artisan db:seed   # rôles admin/vendeur/logisticien + un admin de dev + unités/emballages/catégories catalogue
 
 npm run dev            # ou npm run build en prod
 php artisan serve
@@ -30,7 +30,7 @@ php artisan serve
 - [x] Socle Laravel + Breeze (auth Vue/Inertia/Tailwind)
 - [x] Rôles (Spatie Permission) : `admin`, `vendeur`, `logisticien`
 - [x] Clés UUID sur `users` et les tables de permissions
-- [ ] Catalogue produits multi-unités/emballages
+- [x] Catalogue produits multi-unités/emballages
 - [ ] Stock (quantités + mouvements)
 - [ ] Vente / POS (double devise USD/CDF, paiement espèces)
 - [ ] Page config (magasin, branding, langue, taux de change, TVA)

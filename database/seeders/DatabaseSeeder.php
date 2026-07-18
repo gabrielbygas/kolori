@@ -16,6 +16,10 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call(RoleSeeder::class);
+        // modify by claude
+        $this->call(UnitSeeder::class);
+        $this->call(PackagingTypeSeeder::class);
+        $this->call(ProductCategorySeeder::class);
 
         $admin = User::factory()->create([
             'name' => 'Admin Kolori',
