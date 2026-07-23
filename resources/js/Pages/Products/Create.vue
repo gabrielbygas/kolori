@@ -27,6 +27,7 @@ const form = useForm({
             retail_price: '',
             wholesale_price: '',
             wholesale_min_qty: '',
+            low_stock_threshold: '',
             is_active: true,
         },
     ],

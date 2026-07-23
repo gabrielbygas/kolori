@@ -20,7 +20,7 @@ Règles de mise à jour (voir `CLAUDE.md` §11) :
 | 2 | Rôles (Spatie Permission) : `admin`, `vendeur`, `logisticien` | ✅ Fait |
 | 3 | Clés UUID sur `users` et les tables de permissions | ✅ Fait |
 | 4 | Catalogue produits multi-unités/emballages | ✅ Fait |
-| 5 | Stock (quantités + mouvements) | ⬜ À faire |
+| 5 | Stock (quantités + mouvements) | ✅ Fait |
 | 6 | Vente / POS (double devise USD/CDF, paiement espèces) | ⬜ À faire |
 | 7 | Page config (magasin, branding, langue, taux de change, TVA) | ⬜ À faire |
 | 8 | Multi-magasin (table `stores` + scoping) | ⬜ À faire |
@@ -152,6 +152,105 @@ Demandés par l'utilisateur après la démo de fin de point 4, avant de démarre
 Vérifié : suite de tests complète (37 passed / 101 assertions), `vendor/bin/pint --test` propre, `php artisan migrate:fresh --seed` puis parcours manuel en navigateur (redirection `/`, 404 sur `/register`, connexion admin, `/products` affiche les 5 produits de démo, création d'un utilisateur "Jean Vendeur" avec rôle vendeur via `/users/create` — donnée de test nettoyée ensuite).
 
 ⚠️ Le navigateur intégré de l'outil s'est bloqué une fois en cours de route (screenshot en timeout) — contournement en ouvrant un nouvel onglet, sans lien avec l'application (confirmé par un test HTTP direct qui passait pendant le blocage).
+
+---
+
+## Point 5 — Stock (quantités + mouvements)
+
+Quantité courante par variante (`product_variants.current_stock`) + historique des mouvements (`stock_movements` : entrée/sortie, quantité, motif, utilisateur). Pas de workflow d'achat formel (§4/§5 CLAUDE.md) — mouvements manuels uniquement.
+
+### Sous-points
+
+| # | Sous-point | Statut |
+|---|------------|--------|
+| 5.1 | Migration : `current_stock` sur `product_variants` + table `stock_movements` | ✅ Fait |
+| 5.2 | Modèle Eloquent `StockMovement` + Action qui applique un mouvement et met à jour `current_stock` (transaction, verrou, refus si stock négatif) | ✅ Fait |
+| 5.3 | CRUD minimal Inertia/Vue : page mouvements de stock (liste + ajout manuel), accès admin/logisticien | ✅ Fait |
+| 5.4 | Alerte stock bas : seuil configurable par variante + indicateur visuel dans le catalogue | ✅ Fait |
+| 5.5 | Tests : mouvement met à jour la quantité, refus stock négatif, contrôle d'accès par rôle | ✅ Fait |
+
+### Journal (rempli au fur et à mesure)
+
+**5.1 — Migrations stock** (2026-07-23)
+
+2 migrations créées dans `database/migrations/` :
+- `2026_07_23_180912_add_current_stock_to_product_variants_table.php` — ajoute `current_stock` (decimal 12,2, défaut 0) sur `product_variants`.
+- `2026_07_23_180913_create_stock_movements_table.php` — table `stock_movements` : PK uuid, FK `product_variant_id` (cascade), `type` (enum `in`/`out`), `quantity` (decimal 12,2 — pas de contrainte `unsigned` en base, `unsignedDecimal()` n'existe plus sur `Blueprint` dans cette version de Laravel ; la non-négativité sera imposée côté validation applicative au sous-point 5.2), `reason` nullable, FK `user_id` (nullable, `nullOnDelete` — l'historique reste si le compte est supprimé), index composite `(product_variant_id, created_at)` pour l'historique par variante.
+
+`CLAUDE.md` — MLD mis à jour (règle transverse) : `PRODUCT_VARIANTS.current_stock` ajouté, nouvelle entité `STOCK_MOVEMENTS` et ses relations avec `PRODUCT_VARIANTS`/`USERS`.
+
+Vérifié : `php artisan migrate` OK (un aller-retour sur `unsignedDecimal` corrigé en cours de route), `migrate:rollback --step=2` puis re-`migrate` OK, suite de tests existante toujours verte (37 passed / 101 assertions).
+
+**5.2 — Modèle StockMovement + Action** (2026-07-23)
+
+- `app/Enums/StockMovementType.php` — enum natif PHP backé (`in`/`out`).
+- `app/Models/StockMovement.php` — `#[Fillable(['product_variant_id', 'type', 'quantity', 'reason', 'user_id'])]`, casts `type` → `StockMovementType`, `quantity` → `decimal:2`, relations `belongsTo` vers `ProductVariant` et `User`.
+- `app/Models/ProductVariant.php` — ajout du cast `current_stock` → `decimal:2` et de la relation `hasMany(StockMovement::class)` (`stockMovements()`). `current_stock` reste volontairement absent du `#[Fillable]` : ne doit jamais être modifiable en masse (formulaire produit, etc.), seule `RecordStockMovementAction` y touche.
+- `app/Actions/Stock/RecordStockMovementAction.php` — dans une transaction avec `lockForUpdate()` sur la variante (évite les courses concurrentes entre deux mouvements simultanés) : calcule le nouveau stock en arithmétique décimale exacte (`bcadd`/`bccomp`, jamais de flottant sur une quantité), refuse le mouvement (`ValidationException`) si le résultat serait négatif, enregistre le `StockMovement`, puis applique `current_stock` via `forceFill()` (contournement volontaire et documenté du `$fillable`, réservé à cette Action).
+
+🐛 **Bug trouvé et corrigé pendant la vérification** : la première version utilisait `$variant->update(['current_stock' => $newStock])`, qui échouait *silencieusement* (aucune exception, `current_stock` simplement ignoré) puisque la colonne est hors du `$fillable` — la protection que je venais d'ajouter bloquait ma propre Action. Corrigé en remplaçant par `forceFill()->save()`.
+
+Vérifié en conditions réelles (`php artisan tinker`, transaction annulée après coup) : entrée +50 → stock 50 ; sortie -20 → stock 30 ; tentative de sortie de 1000 → `ValidationException` levée avec le bon message, stock inchangé à 30, mouvement rejeté non enregistré (2 mouvements en base, pas 3). Suite de tests existante toujours verte (37 passed / 101 assertions), `vendor/bin/pint --test` propre.
+
+**5.3 — Page Stock (Inertia/Vue)** (2026-07-23)
+
+Demande explicite de l'utilisateur : soigner particulièrement l'ergonomie (contexte RDC — connexions lentes, usage mobile en magasin, mouvements fréquents tout au long de la journée). Décisions de conception :
+- **Une seule page** (`/stock`), pas de navigation séparée liste/création : le formulaire d'ajout est toujours visible en haut, zéro clic de navigation pour enregistrer un mouvement.
+- **Journal immuable** : pas de routes edit/delete sur les mouvements (comme une vraie comptabilité — une erreur se corrige par un mouvement inverse, jamais en réécrivant l'historique).
+- Sélection rapide : chaque ligne du tableau "Stock actuel" a un bouton "Mouvement" qui pré-remplit la variante dans le formulaire et scrolle/focus automatiquement, pour éviter de rechercher dans une longue liste déroulante à chaque fois.
+- Toggle Entrée/Sortie en 2 gros boutons colorés (vert/rouge) plutôt qu'un `<select>`, pour limiter les erreurs de saisie sur un geste répété des dizaines de fois par jour.
+- "Derniers mouvements" : les 20 derniers uniquement, sans pagination — reste léger.
+
+Fichiers :
+- `app/Http/Requests/Stock/StoreStockMovementRequest.php` — validation (`product_variant_id` existant, `type` parmi l'enum, `quantity` numérique > 0).
+- `app/Http/Resources/StockVariantResource.php`, `StockMovementResource.php` — libellé produit (`"Produit — Unité / Emballage"`) calculé côté serveur, pour garder le Vue simple (juste afficher des chaînes, aucune logique de formatage côté client).
+- `app/Http/Controllers/StockMovementController.php` — `index` (variantes actives + 20 derniers mouvements), `store` (délègue à `RecordStockMovementAction`, `user_id` = utilisateur connecté).
+- `routes/web.php` — `GET/POST /stock` sous `['auth','verified','role:admin|logisticien']` (routes explicites, pas `Route::resource`, puisque seuls index/store existent).
+- `resources/js/Pages/Stock/Index.vue` — page unique décrite ci-dessus, mobile-first (gros boutons, `inputmode="decimal"` sur la quantité).
+- `resources/js/Layouts/AuthenticatedLayout.vue` — lien nav "Stock" (desktop + mobile), même règle de visibilité que "Catalogue".
+
+⚠️ Le navigateur intégré de l'outil a de nouveau bloqué certains clics (boutons Entrée/Sortie, Enregistrer) sans aucune requête réseau déclenchée — même symptôme qu'au point 4. Contourné en rouvrant un onglet, puis en déclenchant les clics via `element.click()` en JS (équivalent d'un vrai clic utilisateur, déclenche normalement les handlers Vue) pour fiabiliser la vérification.
+
+Vérifié en conditions réelles (navigateur, viewport mobile 375×812, avec les produits de démo) :
+- Sélection rapide depuis une ligne du tableau → variante bien pré-remplie dans le formulaire.
+- Entrée de 100 → stock affiché passe à 100.00, apparaît dans "Derniers mouvements" avec date/utilisateur/motif.
+- Tentative de sortie de 500 (stock insuffisant) → message d'erreur clair sous le champ quantité, stock inchangé, rien enregistré.
+- Sortie valide de 30 → stock passe à 70.00.
+- Accès `/stock` refusé (403) pour un compte `vendeur`.
+- Données de test nettoyées (mouvements supprimés, stocks remis à 0, utilisateur de test supprimé).
+
+Suite de tests complète toujours verte (37 passed / 101 assertions), `vendor/bin/pint --test` propre. Pas de test automatisé dédié à ce CRUD pour l'instant — couverture prévue au sous-point 5.5.
+
+**5.4 — Alerte stock bas** (2026-07-23)
+
+- `database/migrations/2026_07_23_184128_add_low_stock_threshold_to_product_variants_table.php` — colonne `low_stock_threshold` (decimal 12,2, nullable) sur `product_variants`.
+- `app/Models/ProductVariant.php` — `low_stock_threshold` ajouté au `#[Fillable]` (contrairement à `current_stock`, c'est une valeur de configuration normale, pas soumise à la même protection) et à son cast `decimal:2`. Nouvelle méthode `isLowStock(): bool` — vrai si un seuil est défini et que `current_stock` est à ou sous ce seuil (comparaison `bccomp`, pas de flottant). Seule source de vérité, réutilisée par les deux Resources ci-dessous.
+- `StoreProductRequest`/`UpdateProductRequest` — règle `variants.*.low_stock_threshold` (nullable, numérique, ≥ 0).
+- `CreateProductAction`/`UpdateProductAction` — transmettent le seuil à la création/mise à jour des variantes.
+- `ProductVariantResource`, `StockVariantResource` — exposent `low_stock_threshold` et `is_low_stock` (calculé côté serveur, comme les libellés — le Vue n'a aucune logique métier à dupliquer).
+- `Products/Partials/ProductFormFields.vue` — champ "Alerte stock bas" par variante, à côté du "Seuil gros".
+- `Products/Index.vue` — badge orange + ⚠ sur la variante concernée dans la colonne "Variantes".
+- `Stock/Index.vue` — ligne surlignée (fond orange clair) + libellé "⚠ Stock bas" dans la liste "Stock actuel" (la page la plus consultée au quotidien, priorité à la visibilité là plutôt que dans le catalogue).
+
+Vérifié : migration + rollback + re-migrate OK. Cas limites de `isLowStock()` testés en tinker (stock < seuil → vrai, stock == seuil → vrai, stock > seuil → faux). Vérifié visuellement en navigateur (seuil 10 / stock 5 sur une variante) : badge ⚠ affiché à la fois dans `/products` et `/stock`. Données de test remises à zéro après coup. Suite de tests complète toujours verte (37 passed / 101 assertions), `vendor/bin/pint --test` propre.
+
+**5.5 — Tests stock** (2026-07-23)
+
+`tests/Feature/StockMovementTest.php` — 8 tests (style PHPUnit classique, cohérent avec le reste du projet) :
+- `test_admin_can_record_an_in_movement_and_stock_increases` — POST `/stock` avec `type=in`, vérifie `current_stock` (10 → 35) et la ligne `stock_movements` créée avec le bon `user_id`.
+- `test_admin_can_record_an_out_movement_and_stock_decreases` — `type=out`, 30 → 18.
+- `test_logisticien_can_record_a_movement` — confirme que le 2e rôle autorisé a bien accès, pas seulement `admin`.
+- `test_out_movement_is_rejected_when_it_would_make_stock_negative` — sortie de 50 sur un stock de 10 : erreur de validation sur `quantity`, stock inchangé, aucune ligne `stock_movements` créée (protège l'intégrité même en contournant l'UI).
+- `test_vendeur_cannot_access_stock_page` — 403 sur `GET` et `POST /stock` pour un rôle non autorisé.
+- `test_guest_is_redirected_to_login`.
+- `test_variant_is_flagged_low_stock_at_or_below_threshold` — cas limites de `ProductVariant::isLowStock()` (stock < seuil, stock == seuil, stock > seuil) directement sur le modèle.
+- `test_variant_without_threshold_is_never_flagged_low_stock` — pas d'alerte tant qu'aucun seuil n'est configuré.
+
+Les factories `ProductVariantFactory` (créée au point 4.5) et l'astuce `Model::unguarded()` interne aux factories Eloquent permettent de fixer `current_stock`/`low_stock_threshold` directement dans les tests malgré leur absence du `$fillable` — sans affaiblir la protection en dehors des tests.
+
+Vérifié : `php artisan test --filter=StockMovementTest` (8 passed / 25 assertions) puis suite complète (45 passed / 126 assertions). `vendor/bin/pint --test` propre.
+
+**Point 5 (Stock) terminé** — les 5 sous-points sont faits et vérifiés.
 
 ---
 

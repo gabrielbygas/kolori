@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\StockMovementController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -24,6 +25,11 @@ Route::middleware('auth')->group(function () {
 // modify by claude
 Route::middleware(['auth', 'verified', 'role:admin|logisticien'])->group(function () {
     Route::resource('products', ProductController::class)->only(['index', 'create', 'store', 'edit', 'update']);
+
+    // Mouvements de stock : journal immuable (pas d'edit/delete, une erreur
+    // se corrige par un mouvement inverse, jamais en réécrivant l'historique).
+    Route::get('/stock', [StockMovementController::class, 'index'])->name('stock.index');
+    Route::post('/stock', [StockMovementController::class, 'store'])->name('stock.store');
 });
 
 // modify by claude

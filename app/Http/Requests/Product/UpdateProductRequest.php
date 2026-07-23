@@ -38,6 +38,7 @@ class UpdateProductRequest extends FormRequest
             'variants.*.retail_price' => ['required', 'numeric', 'min:0'],
             'variants.*.wholesale_price' => ['nullable', 'numeric', 'min:0'],
             'variants.*.wholesale_min_qty' => ['nullable', 'integer', 'min:1'],
+            'variants.*.low_stock_threshold' => ['nullable', 'numeric', 'min:0'],
             'variants.*.is_active' => ['boolean'],
         ];
     }

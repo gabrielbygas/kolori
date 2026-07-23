@@ -55,6 +55,13 @@ const isAdmin = computed(() => (page.props.auth.roles ?? []).includes('admin'));
                                     Catalogue
                                 </NavLink>
                                 <NavLink
+                                    v-if="canManageCatalog"
+                                    :href="route('stock.index')"
+                                    :active="route().current('stock.*')"
+                                >
+                                    Stock
+                                </NavLink>
+                                <NavLink
                                     v-if="isAdmin"
                                     :href="route('users.index')"
                                     :active="route().current('users.*')"
@@ -174,6 +181,13 @@ const isAdmin = computed(() => (page.props.auth.roles ?? []).includes('admin'));
                             :active="route().current('products.*')"
                         >
                             Catalogue
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink
+                            v-if="canManageCatalog"
+                            :href="route('stock.index')"
+                            :active="route().current('stock.*')"
+                        >
+                            Stock
                         </ResponsiveNavLink>
                         <ResponsiveNavLink
                             v-if="isAdmin"

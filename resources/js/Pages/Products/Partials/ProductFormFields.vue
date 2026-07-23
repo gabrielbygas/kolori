@@ -22,6 +22,7 @@ function addVariant() {
         retail_price: '',
         wholesale_price: '',
         wholesale_min_qty: '',
+        low_stock_threshold: '',
         is_active: true,
     });
 }
@@ -193,6 +194,18 @@ function removeVariant(index) {
                         v-model="variant.wholesale_min_qty"
                         type="number"
                         min="1"
+                        class="mt-1 block w-full"
+                    />
+                </div>
+
+                <div class="sm:col-span-1">
+                    <InputLabel :for="`low_stock_${index}`" value="Alerte stock bas" />
+                    <TextInput
+                        :id="`low_stock_${index}`"
+                        v-model="variant.low_stock_threshold"
+                        type="number"
+                        step="0.01"
+                        min="0"
                         class="mt-1 block w-full"
                     />
                 </div>

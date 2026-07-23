@@ -35,6 +35,7 @@ class UpdateProductAction
                     'retail_price' => $variant['retail_price'],
                     'wholesale_price' => $variant['wholesale_price'] ?? null,
                     'wholesale_min_qty' => $variant['wholesale_min_qty'] ?? null,
+                    'low_stock_threshold' => $variant['low_stock_threshold'] ?? null,
                     'is_active' => $variant['is_active'] ?? true,
                 ];
 

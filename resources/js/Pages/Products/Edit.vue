@@ -27,6 +27,7 @@ const form = useForm({
         retail_price: variant.retail_price,
         wholesale_price: variant.wholesale_price,
         wholesale_min_qty: variant.wholesale_min_qty,
+        low_stock_threshold: variant.low_stock_threshold,
         is_active: variant.is_active,
     })),
 });

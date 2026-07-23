@@ -72,9 +72,15 @@ const page = usePage();
                                     <span
                                         v-for="variant in product.variants"
                                         :key="variant.id"
-                                        class="mr-2 inline-block rounded bg-gray-100 px-2 py-0.5 text-xs dark:bg-gray-700"
+                                        :class="[
+                                            'mr-2 inline-block rounded px-2 py-0.5 text-xs',
+                                            variant.is_low_stock
+                                                ? 'bg-orange-50 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300'
+                                                : 'bg-gray-100 dark:bg-gray-700',
+                                        ]"
+                                        :title="variant.is_low_stock ? 'Stock bas' : ''"
                                     >
-                                        {{ variant.unit?.name_fr }}<template v-if="variant.packaging_type"> / {{ variant.packaging_type?.name_fr }}</template> — ${{ variant.retail_price }}
+                                        {{ variant.unit?.name_fr }}<template v-if="variant.packaging_type"> / {{ variant.packaging_type?.name_fr }}</template> — ${{ variant.retail_price }}<template v-if="variant.is_low_stock"> ⚠</template>
                                     </span>
                                 </td>
                                 <td class="px-4 py-3 text-sm">

@@ -33,7 +33,7 @@ Laravel 13 (PHP 8.3) + Inertia + Vue 3 + Tailwind, MySQL 8/MariaDB, Breeze (auth
 
 - [x] Rôles (≤5, définis en dur) : `admin`, `vendeur`, `logisticien` (2 slots optionnels si besoin réel apparaît).
 - [x] Catalogue produits multi-unités/emballages (kg, sac, litre, bidon, pièce, paquet, rouleau, boîte, carton), prix détail/gros par variante, origine local/importé.
-- [ ] Stock simple : quantité courante + mouvements (pas de workflow d'achat formel).
+- [x] Stock simple : quantité courante + mouvements (pas de workflow d'achat formel).
 - [ ] Vente/POS : sélection produits, calcul double devise, paiement espèces uniquement (V1), reçu PDF/impression navigateur.
 - [ ] Tableau de bord basique : ventes du jour, alertes stock bas.
 - [ ] Page config : nom du magasin, logo, couleurs, langue, taux de change, taux de TVA.
@@ -59,6 +59,8 @@ erDiagram
     PRODUCTS ||--o{ PRODUCT_VARIANTS : "décline en"
     UNITS ||--o{ PRODUCT_VARIANTS : "unité de vente"
     PACKAGING_TYPES |o--o{ PRODUCT_VARIANTS : "emballage (optionnel)"
+    PRODUCT_VARIANTS ||--o{ STOCK_MOVEMENTS : "historique"
+    USERS |o--o{ STOCK_MOVEMENTS : "enregistré par"
 
     USERS {
         uuid id PK
@@ -113,6 +115,16 @@ erDiagram
         decimal retail_price
         decimal wholesale_price
         int wholesale_min_qty
+        decimal current_stock
+        decimal low_stock_threshold
+    }
+    STOCK_MOVEMENTS {
+        uuid id PK
+        uuid product_variant_id FK
+        enum type
+        decimal quantity
+        string reason
+        uuid user_id FK
     }
 ```
 
@@ -136,7 +148,7 @@ PlanetHoster ou VPS allemand économique. PWA installable. Cron serveur 5h/23h p
 
 ## 10. Jalons de livraison
 
-- **S1** — [x] Socle (Laravel + Breeze + Spatie Permission + UUID + rôles). [x] Catalogue produits. [ ] Stock.
+- **S1** — [x] Socle (Laravel + Breeze + Spatie Permission + UUID + rôles). [x] Catalogue produits. [x] Stock.
 - **S2** — [ ] Vente/POS, double devise, page config (branding + taux + TVA), queue offline PWA.
 - **S3** — [ ] Rapports, reçus PDF, polish responsive, tests du flux critique, déploiement.
 
@@ -151,6 +163,6 @@ Pour toute nouvelle fonctionnalité ou modification sur ce projet, suivre cet or
 
 ## État actuel
 
-Squelette posé et poussé sur GitHub (`gabrielbygas/kolori`) le 2026-07-17 : Laravel 13 + Breeze (Vue/Inertia/Tailwind) + Spatie Permission + UUID sur `users` et les tables de permissions + rôles `admin`/`vendeur`/`logisticien` seedés. Catalogue produits (point 4) terminé le 2026-07-18 : tables + seeder (27 catégories) + modèles + CRUD Inertia/Vue (admin/logisticien) + API Resources + tests. Pas d'inscription publique : comptes créés par un admin via `/users` (voir `tasks.md` — "Ajustements hors plan").
+Squelette posé et poussé sur GitHub (`gabrielbygas/kolori`) le 2026-07-17 : Laravel 13 + Breeze (Vue/Inertia/Tailwind) + Spatie Permission + UUID sur `users` et les tables de permissions + rôles `admin`/`vendeur`/`logisticien` seedés. Catalogue produits (point 4) terminé le 2026-07-18 : tables + seeder (27 catégories) + modèles + CRUD Inertia/Vue (admin/logisticien) + API Resources + tests. Pas d'inscription publique : comptes créés par un admin via `/users` (voir `tasks.md` — "Ajustements hors plan"). Stock (point 5) terminé le 2026-07-23 : quantité courante + mouvements (entrée/sortie, journal immuable), page `/stock` unique pensée mobile-first pour un usage magasin en RDC, alerte stock bas.
 
 Détail point par point (statut, sous-points en cours, journal) : voir [`tasks.md`](./tasks.md).

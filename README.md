@@ -31,7 +31,7 @@ php artisan serve
 - [x] Rôles (Spatie Permission) : `admin`, `vendeur`, `logisticien`
 - [x] Clés UUID sur `users` et les tables de permissions
 - [x] Catalogue produits multi-unités/emballages
-- [ ] Stock (quantités + mouvements)
+- [x] Stock (quantités + mouvements, alerte stock bas)
 - [ ] Vente / POS (double devise USD/CDF, paiement espèces)
 - [ ] Page config (magasin, branding, langue, taux de change, TVA)
 - [ ] Multi-magasin (table `stores` + scoping)
