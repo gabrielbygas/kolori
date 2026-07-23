@@ -34,7 +34,7 @@ Laravel 13 (PHP 8.3) + Inertia + Vue 3 + Tailwind, MySQL 8/MariaDB, Breeze (auth
 - [x] Rôles (≤5, définis en dur) : `admin`, `vendeur`, `logisticien` (2 slots optionnels si besoin réel apparaît).
 - [x] Catalogue produits multi-unités/emballages (kg, sac, litre, bidon, pièce, paquet, rouleau, boîte, carton), prix détail/gros par variante, origine local/importé.
 - [x] Stock simple : quantité courante + mouvements (pas de workflow d'achat formel).
-- [ ] Vente/POS : sélection produits, calcul double devise, paiement espèces uniquement (V1), reçu PDF/impression navigateur.
+- [x] Vente/POS : sélection produits, calcul double devise, paiement espèces uniquement (V1), reçu PDF/impression navigateur.
 - [ ] Tableau de bord basique : ventes du jour, alertes stock bas.
 - [ ] Page config : nom du magasin, logo, couleurs, langue, taux de change, taux de TVA.
 - [ ] Multi-magasin : une entreprise, plusieurs magasins (table `stores` + scoping `store_id`).
@@ -61,6 +61,10 @@ erDiagram
     PACKAGING_TYPES |o--o{ PRODUCT_VARIANTS : "emballage (optionnel)"
     PRODUCT_VARIANTS ||--o{ STOCK_MOVEMENTS : "historique"
     USERS |o--o{ STOCK_MOVEMENTS : "enregistré par"
+    USERS ||--o{ SALES : "vendu par"
+    SALES ||--o{ SALE_ITEMS : "contient"
+    PRODUCT_VARIANTS ||--o{ SALE_ITEMS : "vendue dans"
+    SALES |o--o{ STOCK_MOVEMENTS : "décrémente"
 
     USERS {
         uuid id PK
@@ -121,10 +125,30 @@ erDiagram
     STOCK_MOVEMENTS {
         uuid id PK
         uuid product_variant_id FK
+        uuid sale_id FK
         enum type
         decimal quantity
         string reason
         uuid user_id FK
+    }
+    SALES {
+        uuid id PK
+        uuid user_id FK
+        decimal total_usd
+        decimal exchange_rate
+        decimal total_cdf
+        enum payment_currency
+        decimal amount_tendered
+        decimal change_due
+    }
+    SALE_ITEMS {
+        uuid id PK
+        uuid sale_id FK
+        uuid product_variant_id FK
+        decimal quantity
+        enum pricing_tier
+        decimal unit_price
+        decimal subtotal
     }
 ```
 
@@ -149,7 +173,7 @@ PlanetHoster ou VPS allemand économique. PWA installable. Cron serveur 5h/23h p
 ## 10. Jalons de livraison
 
 - **S1** — [x] Socle (Laravel + Breeze + Spatie Permission + UUID + rôles). [x] Catalogue produits. [x] Stock.
-- **S2** — [ ] Vente/POS, double devise, page config (branding + taux + TVA), queue offline PWA.
+- **S2** — [x] Vente/POS, double devise. [ ] Page config (branding + taux + TVA). [ ] Queue offline PWA.
 - **S3** — [ ] Rapports, reçus PDF, polish responsive, tests du flux critique, déploiement.
 
 ## 11. Workflow pour chaque point du plan
@@ -163,6 +187,6 @@ Pour toute nouvelle fonctionnalité ou modification sur ce projet, suivre cet or
 
 ## État actuel
 
-Squelette posé et poussé sur GitHub (`gabrielbygas/kolori`) le 2026-07-17 : Laravel 13 + Breeze (Vue/Inertia/Tailwind) + Spatie Permission + UUID sur `users` et les tables de permissions + rôles `admin`/`vendeur`/`logisticien` seedés. Catalogue produits (point 4) terminé le 2026-07-18 : tables + seeder (27 catégories) + modèles + CRUD Inertia/Vue (admin/logisticien) + API Resources + tests. Pas d'inscription publique : comptes créés par un admin via `/users` (voir `tasks.md` — "Ajustements hors plan"). Stock (point 5) terminé le 2026-07-23 : quantité courante + mouvements (entrée/sortie, journal immuable), page `/stock` unique pensée mobile-first pour un usage magasin en RDC, alerte stock bas.
+Squelette posé et poussé sur GitHub (`gabrielbygas/kolori`) le 2026-07-17 : Laravel 13 + Breeze (Vue/Inertia/Tailwind) + Spatie Permission + UUID sur `users` et les tables de permissions + rôles `admin`/`vendeur`/`logisticien` seedés. Catalogue produits (point 4) terminé le 2026-07-18 : tables + seeder (27 catégories) + modèles + CRUD Inertia/Vue (admin/logisticien) + API Resources + tests. Pas d'inscription publique : comptes créés par un admin via `/users` (voir `tasks.md` — "Ajustements hors plan"). Stock (point 5) terminé le 2026-07-23 : quantité courante + mouvements (entrée/sortie, journal immuable), page `/stock` unique pensée mobile-first pour un usage magasin en RDC, alerte stock bas. Vente/POS (point 6) terminé le 2026-07-23 : page caisse `/pos` (même philosophie mobile-first), calcul détail/gros auto ou manuel selon réglage, double devise USD/CDF (taux et mode de tarification en `config/kolori.php` en attendant le point 7), décrément de stock réutilisant directement le point 5, reçu imprimable + PDF (`dompdf`). ⚠️ Aucune vue construite jusqu'ici n'est bilingue (tout en dur en français) — le point 7 devra d'abord mettre en place un système de traduction avant le sélecteur de langue (voir `tasks.md`).
 
 Détail point par point (statut, sous-points en cours, journal) : voir [`tasks.md`](./tasks.md).

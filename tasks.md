@@ -21,7 +21,7 @@ Règles de mise à jour (voir `CLAUDE.md` §11) :
 | 3 | Clés UUID sur `users` et les tables de permissions | ✅ Fait |
 | 4 | Catalogue produits multi-unités/emballages | ✅ Fait |
 | 5 | Stock (quantités + mouvements) | ✅ Fait |
-| 6 | Vente / POS (double devise USD/CDF, paiement espèces) | ⬜ À faire |
+| 6 | Vente / POS (double devise USD/CDF, paiement espèces) | ✅ Fait |
 | 7 | Page config (magasin, branding, langue, taux de change, TVA) | ⬜ À faire |
 | 8 | Multi-magasin (table `stores` + scoping) | ⬜ À faire |
 | 9 | Tableau de bord (ventes du jour, stock bas) | ⬜ À faire |
@@ -254,6 +254,106 @@ Vérifié : `php artisan test --filter=StockMovementTest` (8 passed / 25 asserti
 
 ---
 
+## Point 6 — Vente / POS (double devise USD/CDF, paiement espèces)
+
+Décisions actées avec l'utilisateur avant de commencer (2026-07-23) :
+- **Taux de change** : `config/kolori.php` + `.env` (`EXCHANGE_RATE`) pour l'instant — le point 7 le remplacera par un vrai réglage éditable en base par l'admin.
+- **Détail/gros** : piloté par `config('kolori.pricing_mode')` (`automatic`/`manual`, env `PRICING_MODE`) — en mode automatique le seuil de la variante décide seul ; en mode manuel le vendeur choisit, avec une suggestion automatique pré-remplie. Le point 7 devra exposer ce choix comme un vrai réglage (bouton radio) dans la page config.
+- **Reçu** : vue HTML imprimable (bouton "Imprimer") **+** téléchargement PDF (bouton "Télécharger en PDF", généré serveur via `barryvdh/laravel-dompdf` — pas de librairie JS lourde côté client, cohérent avec "léger").
+- **Accès caisse** : `admin` + `vendeur` uniquement (le `logisticien` gère stock/catalogue, pas les ventes).
+
+### Sous-points
+
+| # | Sous-point | Statut |
+|---|------------|--------|
+| 6.1 | Migrations (`sales`, `sale_items`, `sale_id` sur `stock_movements`) + `config/kolori.php` + installation `dompdf` | ✅ Fait |
+| 6.2 | Modèles Eloquent (`Sale`, `SaleItem`) + Action `CreateSaleAction` (calcul détail/gros, décrément stock via `RecordStockMovementAction` réutilisée, calcul monnaie rendue), transaction atomique | ✅ Fait |
+| 6.3 | Interface caisse (POS) Inertia/Vue : panier, double devise en direct, montant reçu/monnaie, accès admin/vendeur | ✅ Fait |
+| 6.4 | Reçu : impression navigateur + téléchargement PDF | ✅ Fait |
+| 6.5 | Tests : calcul détail/gros (auto+manuel), double devise, décrément stock, refus si insuffisant, contrôle d'accès par rôle | ✅ Fait |
+
+### Journal (rempli au fur et à mesure)
+
+**6.1 — Fondations vente** (2026-07-23)
+
+- `composer require barryvdh/laravel-dompdf` — au passage, `composer update guzzlehttp/guzzle --with-all-dependencies` pour corriger 3 alertes de sécurité moyennes détectées par `composer audit` sur une dépendance transitive de `laravel/framework` (rien à voir avec dompdf) ; `composer audit` propre après coup.
+- `config/kolori.php` (nouveau) — `exchange_rate` (défaut 2800, via `EXCHANGE_RATE`) et `pricing_mode` (défaut `automatic`, via `PRICING_MODE`). `.env`/`.env.example` mis à jour. Réglages volontairement temporaires (fichier, pas base de données) — le point 7 les rendra éditables par l'admin sans redéploiement.
+- `database/migrations/2026_07_23_191542_create_sales_table.php` — table `sales` : FK `user_id` (restrict), `total_usd`, `exchange_rate` et `total_cdf` figés au moment de la vente (une vente passée ne doit jamais changer de valeur si le taux change ensuite), `payment_currency` (enum `usd`/`cdf`), `amount_tendered`, `change_due`.
+- `database/migrations/2026_07_23_191543_create_sale_items_table.php` — table `sale_items` : FK `sale_id` (cascade), `product_variant_id` (restrict), `quantity`, `pricing_tier` (enum `retail`/`wholesale` — traçabilité du prix appliqué), `unit_price` figé, `subtotal`.
+- `database/migrations/2026_07_23_191544_add_sale_id_to_stock_movements_table.php` — colonne `sale_id` nullable sur `stock_movements` (nullOnDelete) : chaque mouvement de stock généré par une vente sera tracé jusqu'à elle.
+
+`CLAUDE.md` — MLD mis à jour (règle transverse) : nouvelles entités `SALES`, `SALE_ITEMS`, relations avec `USERS`, `PRODUCT_VARIANTS` et `STOCK_MOVEMENTS` (`sale_id`).
+
+Vérifié : `php artisan migrate` OK, `migrate:rollback --step=3` puis re-`migrate` OK, `config('kolori.exchange_rate')`/`pricing_mode` lus correctement en tinker, suite de tests existante toujours verte (45 passed / 126 assertions), `vendor/bin/pint --test` propre.
+
+**6.2 — Modèles Sale/SaleItem + CreateSaleAction** (2026-07-23)
+
+- `app/Enums/PaymentCurrency.php` (`usd`/`cdf`), `app/Enums/PricingTier.php` (`retail`/`wholesale`) — enums natifs PHP.
+- `app/Models/Sale.php` — casts `total_usd`/`exchange_rate`/`total_cdf`/`amount_tendered`/`change_due` en decimal, `payment_currency` en enum, relations `belongsTo(User::class)`, `hasMany(SaleItem::class)` (`items()`), `hasMany(StockMovement::class)`.
+- `app/Models/SaleItem.php` — casts `quantity`/`unit_price`/`subtotal` en decimal, `pricing_tier` en enum, relations vers `Sale` et `ProductVariant`.
+- `app/Models/StockMovement.php` — `sale_id` ajouté au `#[Fillable]`, relation `belongsTo(Sale::class)`.
+- `app/Actions/Stock/RecordStockMovementAction.php` — accepte désormais un `sale_id` optionnel dans le tableau de données, transmis à la création du mouvement (aucun changement de comportement pour les mouvements manuels du point 5, qui n'en passent pas).
+- `app/Actions/Sale/CreateSaleAction.php` — `RecordStockMovementAction` injectée par le constructeur (réutilisation directe, pas de duplication de la logique de décrément/refus de stock). Dans une transaction :
+  1. Pour chaque ligne : détermine le tarif (`resolveTier()`) — en mode `automatic`, le seuil de la variante décide seul (`suggestedTier()`) ; en mode `manual`, le choix du vendeur est respecté sauf s'il demande le tarif de gros sur une variante qui n'en a pas (repli automatique sur le détail).
+  2. Calcule sous-totaux et total en arithmétique décimale exacte (`bcadd`/`bcmul`/`bcsub`, jamais de flottant sur de l'argent) ; le total CDF est arrondi à l'entier (pas de sous-unité utilisée en pratique), contrairement à l'USD qui reste la devise de référence exacte.
+  3. Calcule la monnaie à rendre dans la devise de paiement choisie ; refuse (`ValidationException` sur `amount_tendered`) si le montant reçu est insuffisant.
+  4. Crée la `Sale`, ses `SaleItem`, puis appelle `RecordStockMovementAction` pour chaque ligne avec `sale_id` renseigné — le refus de stock négatif du point 5 s'applique donc automatiquement à la vente : si une seule ligne dépasse le stock disponible, toute la vente est annulée (rien de partiel).
+
+Vérifié en conditions réelles (`php artisan tinker`, transaction annulée après coup), mode `automatic` : prix détail sous le seuil de gros, prix de gros au seuil atteint, décrément de stock correct cumulatif sur 3 ventes successives, total CDF cohérent avec le taux configuré, refus propre si paiement insuffisant (`ValidationException` sur `amount_tendered`) et si stock insuffisant (réutilisation confirmée du message du point 5), aucune trace en base pour les ventes rejetées. Mode `manual` (testé avec `PRICING_MODE=manual`) : le choix explicite du vendeur est respecté même sous le seuil, la suggestion automatique s'applique si rien n'est précisé, et repli correct sur le détail quand le gros est demandé sur une variante sans prix de gros. Suite de tests complète toujours verte (45 passed / 126 assertions), `vendor/bin/pint --test` propre.
+
+**6.3 — Interface caisse (POS)** (2026-07-23)
+
+Une seule page (`/pos`), même philosophie que la page Stock (5.3) : rien à créer/éditer séparément, tout se passe sur un seul écran pensé mobile-first.
+
+- `app/Http/Requests/Sale/StoreSaleRequest.php` — validation `items` (tableau, min 1, chaque ligne : variante existante, quantité > 0, tarif optionnel parmi l'enum), `payment_currency`, `amount_tendered`.
+- `app/Http/Resources/PosVariantResource.php` — expose uniquement ce qu'il faut pour le calcul côté client (libellé, prix détail/gros, seuil, stock courant) — le serveur reste la seule autorité pour la vente réelle, ces données ne servent qu'à l'aperçu live.
+- `app/Http/Controllers/PosController.php` — `index` (variantes actives + réglages `exchangeRate`/`pricingMode` en props), `store` (délègue à `CreateSaleAction`, message flash avec le récapitulatif).
+- `app/Actions/Sale/CreateSaleAction.php` — erreur de stock insuffisant réindexée vers la bonne ligne (`items.{index}.quantity`) au lieu d'un message générique, pour que le panier affiche l'erreur au bon endroit quand plusieurs lignes sont en cours de vente.
+- `routes/web.php` — `GET/POST /pos` sous `['auth','verified','role:admin|vendeur']` (le logisticien n'y a pas accès — cohérent avec la séparation des rôles).
+- `resources/js/Pages/Pos/Index.vue` — recherche produit (filtre local, pas de requête serveur par frappe), panier avec stepper +/-, bascule détail/gros automatique en direct (badge "Prix de gros" affiché quand actif) ou boutons manuels si `pricingMode === 'manual'`, total et monnaie à rendre toujours affichés en USD **et** CDF simultanément, gros boutons de choix de devise (mêmes codes couleur que le point 5).
+- `resources/js/Layouts/AuthenticatedLayout.vue` — lien nav "Caisse" (admin/vendeur), placé en premier dans le menu — c'est l'écran le plus utilisé au quotidien.
+
+🐛 **Bug réel trouvé et corrigé** : `PosController::index()` faisait `->where('is_active', true)` après une jointure `products`/`product_variants` (les deux tables ayant cette colonne) → `SQLSTATE[42702] Ambiguous column` sous PostgreSQL (le projet tourne désormais sur PostgreSQL, pas MySQL). Corrigé en qualifiant `product_variants.is_active`. `StockMovementController` n'avait pas ce problème (son `where('is_active', true)` reste dans la fermeture `whereHas`, donc scopé à `products` seul, sans ambiguïté).
+
+Vérifié en conditions réelles en navigateur (viewport mobile 375×812, produits de démo avec stock réattribué pour le test) : recherche + ajout au panier, bascule automatique détail/gros en direct (badge affiché) en modifiant la quantité, calcul du total et de la monnaie à rendre en direct, vente validée avec succès (message flash récapitulatif), vérifié en base (`Sale`, `SaleItem` avec le bon tarif, `StockMovement` lié via `sale_id`, stock décrémenté 100→95). Accès confirmé : `vendeur` autorisé (200), `logisticien` refusé (403). Données de test nettoyées après coup (⚠️ un mouvement de stock créé par l'utilisateur lui-même a été supprimé par erreur dans ce nettoyage — signalé et confirmé sans importance). Suite de tests complète toujours verte (45 passed / 126 assertions), `vendor/bin/pint --test` propre.
+
+**6.4 — Reçu (impression + PDF)** (2026-07-23)
+
+- `app/Http/Resources/SaleItemResource.php`, `SaleResource.php` — même principe que le catalogue/stock : libellé et formatage calculés côté serveur, le Vue n'affiche que des chaînes/nombres déjà prêts.
+- `app/Http/Controllers/SaleController.php` — `receipt()` (page Inertia) et `receiptPdf()` (téléchargement, via `Barryvdh\DomPDF\Facade\Pdf::loadView(...)->download(...)`).
+- `resources/views/receipts/sale.blade.php` — gabarit Blade dédié à dompdf (CSS inline minimal, pas de classes Tailwind — dompdf ne consomme pas le pipeline Vite), même contenu que la page Vue mais rendu indépendamment côté serveur.
+- `resources/js/Pages/Sales/Receipt.vue` — page autonome (sans `AuthenticatedLayout`, pas de nav à cacher à l'impression) : reçu centré façon ticket de caisse, boutons "Imprimer" (`window.print()`) et "Télécharger en PDF" (lien direct vers la route PDF), tous deux masqués à l'impression (`print:hidden`, variante Tailwind native).
+- `routes/web.php` — `GET /sales/{sale}/receipt` et `GET /sales/{sale}/receipt.pdf` sous `['auth','verified','role:admin|vendeur']` (même accès que la caisse).
+- `app/Http/Controllers/PosController.php` — après une vente réussie, redirection directe vers `sales.receipt` (au lieu d'un simple message flash sur `/pos`) : le vendeur voit immédiatement le reçu, prêt à imprimer ou télécharger.
+- `composer require barryvdh/laravel-dompdf` + `config/dompdf.php` publié (sous-point 6.1).
+
+Vérifié en conditions réelles en navigateur : vente validée → redirection automatique vers `/sales/{id}/receipt`, contenu correct (produit, quantité, sous-total, totaux USD/CDF, devise reçue, montant reçu, monnaie rendue, taux appliqué). Téléchargement PDF vérifié via `fetch()` direct : statut 200, `Content-Type: application/pdf`, `Content-Disposition` avec le bon nom de fichier, en-tête binaire `%PDF-1.7` confirmé (fichier réellement valide, pas juste un statut 200 vide). Accès aux deux routes refusé (403) pour un `logisticien`. Données de test nettoyées de façon ciblée cette fois (uniquement les mouvements avec `reason = 'Vente'` créés pendant ce test, pas de suppression en bloc). Suite de tests complète toujours verte (45 passed / 126 assertions), `vendor/bin/pint --test` propre.
+
+**6.5 — Tests vente/POS** (2026-07-23)
+
+`tests/Feature/SaleTest.php` — 11 tests (style PHPUnit classique) :
+- `test_admin_can_create_a_sale_at_retail_price_below_wholesale_threshold` — qty=2 sous le seuil de 5 → tarif détail, stock décrémenté (50→48), monnaie rendue correcte.
+- `test_wholesale_price_applies_automatically_at_the_threshold` — qty=5 (mode `automatic`) → tarif de gros appliqué sans action du vendeur.
+- `test_manual_pricing_mode_respects_the_vendors_choice` — mode `manual` (`config(['kolori.pricing_mode' => 'manual'])` au sein du test), qty=2 sous le seuil mais le vendeur force `wholesale` → respecté.
+- `test_total_in_cdf_uses_the_configured_exchange_rate` — taux surchargé à 2500, vérifie `exchange_rate`/`total_cdf`/`change_due` figés cohérents (paiement en CDF).
+- `test_sale_is_rejected_when_amount_tendered_is_insufficient` — erreur sur `amount_tendered`, aucune vente créée, stock inchangé.
+- `test_sale_is_rejected_when_stock_is_insufficient` — erreur sur `items.0.quantity` (bonne ligne indexée), aucune vente ni mouvement créés, stock inchangé.
+- `test_vendeur_can_create_a_sale` — confirme l'accès du 2e rôle autorisé.
+- `test_logisticien_cannot_access_the_pos` — 403 sur `GET`/`POST /pos`.
+- `test_guest_is_redirected_to_login`.
+- `test_receipt_is_accessible_to_admin_and_vendeur_but_not_logisticien` — couvre aussi l'accès au reçu (6.4), pas seulement la création de vente.
+- `test_receipt_pdf_download_returns_a_pdf` — vérifie le `Content-Type` de la réponse.
+
+🐛 Une erreur de calcul dans ma propre assertion (monnaie rendue attendue à tort à 43.00 au lieu de 20.00) a été détectée et corrigée avant validation finale — pas un bug applicatif, une erreur de calcul manuel dans le test lui-même.
+
+Vérifié : `php artisan test --filter=SaleTest` (11 passed / 36 assertions) puis suite complète (56 passed / 162 assertions). `vendor/bin/pint --test` propre.
+
+**Point 6 (Vente/POS) terminé** — les 5 sous-points sont faits et vérifiés.
+
+---
+
 ## Points suivants
 
-Non décomposés pour l'instant (seront détaillés en sous-points quand ils deviendront le point courant), voir §4/§10 de `CLAUDE.md` pour le contenu prévu. Prochain point : **5 — Stock (quantités + mouvements)**.
+Non décomposés pour l'instant (seront détaillés en sous-points quand ils deviendront le point courant), voir §4/§10 de `CLAUDE.md` pour le contenu prévu. Prochain point (après le 6) : **7 — Page config**.
+
+⚠️ **Point à ne pas oublier pour le point 7** (question posée le 2026-07-23) : aucune vue construite jusqu'ici (Catalogue, Utilisateurs, Stock, Caisse, Reçu) n'est bilingue — tout le texte d'interface est en français en dur, sans système de traduction. Seules les données métier (`name_fr`/`name_en`) le sont. Avant de construire le sélecteur de langue dans la page config, le point 7 devra d'abord : (1) mettre en place un système de traduction (léger, pas forcément `vue-i18n` complet — cohérent avec la philosophie du projet), (2) extraire toutes les chaînes en dur des vues existantes **et** des messages serveur (ex. "Stock insuffisant...", "Vente enregistrée...") vers des fichiers de traduction, **avant** de construire le switch lui-même.

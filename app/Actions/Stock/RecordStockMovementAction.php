@@ -41,6 +41,7 @@ class RecordStockMovementAction
                 'quantity' => $data['quantity'],
                 'reason' => $data['reason'] ?? null,
                 'user_id' => $data['user_id'] ?? null,
+                'sale_id' => $data['sale_id'] ?? null,
             ]);
 
             // current_stock est volontairement hors du $fillable de ProductVariant

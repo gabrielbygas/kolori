@@ -16,6 +16,10 @@ const canManageCatalog = computed(() => {
     return roles.includes('admin') || roles.includes('logisticien');
 });
 const isAdmin = computed(() => (page.props.auth.roles ?? []).includes('admin'));
+const canSell = computed(() => {
+    const roles = page.props.auth.roles ?? [];
+    return roles.includes('admin') || roles.includes('vendeur');
+});
 </script>
 
 <template>
@@ -46,6 +50,13 @@ const isAdmin = computed(() => (page.props.auth.roles ?? []).includes('admin'));
                                     :active="route().current('dashboard')"
                                 >
                                     Dashboard
+                                </NavLink>
+                                <NavLink
+                                    v-if="canSell"
+                                    :href="route('pos.index')"
+                                    :active="route().current('pos.*')"
+                                >
+                                    Caisse
                                 </NavLink>
                                 <NavLink
                                     v-if="canManageCatalog"
@@ -174,6 +185,13 @@ const isAdmin = computed(() => (page.props.auth.roles ?? []).includes('admin'));
                             :active="route().current('dashboard')"
                         >
                             Dashboard
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink
+                            v-if="canSell"
+                            :href="route('pos.index')"
+                            :active="route().current('pos.*')"
+                        >
+                            Caisse
                         </ResponsiveNavLink>
                         <ResponsiveNavLink
                             v-if="canManageCatalog"

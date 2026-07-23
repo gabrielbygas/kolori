@@ -32,11 +32,11 @@ php artisan serve
 - [x] Clés UUID sur `users` et les tables de permissions
 - [x] Catalogue produits multi-unités/emballages
 - [x] Stock (quantités + mouvements, alerte stock bas)
-- [ ] Vente / POS (double devise USD/CDF, paiement espèces)
+- [x] Vente / POS (double devise USD/CDF, paiement espèces, reçu imprimable + PDF)
 - [ ] Page config (magasin, branding, langue, taux de change, TVA)
 - [ ] Multi-magasin (table `stores` + scoping)
 - [ ] Tableau de bord (ventes du jour, stock bas)
-- [ ] Reçus PDF / impression
+- [x] Reçus PDF / impression (livré avec le point 6)
 - [ ] PWA + queue offline
 - [ ] Déploiement (PlanetHoster / VPS)
 
