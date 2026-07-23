@@ -27,7 +27,7 @@ Livrer *Kolori* V1, solide et vendable, en 2-3 semaines. Socle conceptuel vers `
 
 ## 3. Stack technique
 
-Laravel 13 (PHP 8.3) + Inertia + Vue 3 + Tailwind, MySQL 8/MariaDB, Breeze (auth) + Spatie Permission (rôles). PWA à ajouter (service worker + stockage local pour la queue offline).
+Laravel 13 (PHP 8.3) + Inertia + Vue 3 + Tailwind, PostgreSQL 16, Breeze (auth) + Spatie Permission (rôles). PWA à ajouter (service worker + stockage local pour la queue offline).
 
 ## 4. Périmètre fonctionnel V1 (IN)
 

@@ -6,7 +6,7 @@ Le plan complet et les conventions du projet sont dans [`CLAUDE.md`](./CLAUDE.md
 
 ## Stack
 
-Laravel 13 (PHP 8.3) · Inertia · Vue 3 · Tailwind · MySQL/MariaDB · Breeze (auth) · Spatie Permission (rôles)
+Laravel 13 (PHP 8.3) · Inertia · Vue 3 · Tailwind · PostgreSQL · Breeze (auth) · Spatie Permission (rôles)
 
 ## Installation
 
